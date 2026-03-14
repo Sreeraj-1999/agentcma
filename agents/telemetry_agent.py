@@ -107,12 +107,12 @@ class TelemetryAgent:
         # Stage 1: Embedding search (1 API call, ~$0.0001)
         candidates = find_similar_tags(question, top_k=20)
         if not candidates:
-            return self._error_result("No matching sensor tags found")
+            return self._error_result("This data is not available in our telemetry system. Available data includes engine sensors, temperatures, pressures, and alarms.")
 
         # Stage 2: LLM picks exact keys from 20 candidates (~200 tokens)
         selected_keys = self._resolve_keys(question, candidates, context)
         if not selected_keys:
-            return self._error_result("Could not identify relevant sensor tags")
+            return self._error_result("This data is not available in our telemetry system. The requested measurements were not found among the vessel's sensor tags.")
 
         # Generate SQL
         sql = self._generate_sql(question, selected_keys, fk_vessel, context)
@@ -194,9 +194,11 @@ Both: id, payload (JSONB), fk_vessel (INT), "vesselTime" (TIMESTAMP), "vesselTim
 Rules:
 - Double-quote table names: "VesselDataLive", "VesselData"
 - Double-quote camelCase columns: "vesselTime", "vesselTimeStamp", "createdAt"
+- NEVER double-quote fk_vessel — always write it as: fk_vessel = {fk_vessel} (no quotes)
 - payload->>'key' returns text. Cast: (payload->>'key')::float
 - WHERE fk_vessel = {fk_vessel}
 - Latest = "VesselDataLive", Historical = "VesselData"
+- ALWAYS fetch the data first. Do NOT invent threshold values or add arbitrary numeric filters (e.g. > 80) unless the user specifies an exact number. Let the data speak for itself.
 
 Selected keys:
 {chr(10).join(key_info)}
@@ -241,7 +243,11 @@ Return ONLY corrected SQL."""
             {
                 "role": "system",
                 "content": f"""Marine telemetry analyst. Respond with JSON:
-{{"answer": "yes/no with explanation", "condition_met": true/false/null, "evidence": "key data points"}}
+{{"answer": "your answer", "condition_met": true/false/null, "evidence": "key data points"}}
+
+Rules:
+- If the question is a yes/no condition (e.g. "is X above Y?"), answer with yes/no + explanation, and set condition_met to true/false.
+- If the question is informational (e.g. "what is the RPM?"), give a direct answer with the actual values, and set condition_met to null.
 ONLY JSON.{context_str}"""
             },
             {

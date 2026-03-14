@@ -111,6 +111,11 @@ def route_after_step(state: DiagnosticState) -> str:
     current_step = steps[ran_step_idx]
     condition_met = last_result["condition_met"]
 
+    # If the step returned an error (data not available, query failed, etc.)
+    # stop the chain — don't generate alerts based on missing data
+    if str(last_result.get("answer", "")).startswith("Error:"):
+        return "done"
+
     if_yes = str(current_step.get("if_yes", "next_step")).lower()
     if_no = str(current_step.get("if_no", "stop")).lower()
 
@@ -130,7 +135,16 @@ def route_after_step(state: DiagnosticState) -> str:
     else:
         # next_step — check if there are more steps
         if state["current_step_index"] >= len(steps):
-            return "action"
+            # Check if ANY step had a conditional result (yes/no)
+            # If all steps were informational (condition_met = None), skip alert
+            has_conditional = any(
+                r.get("condition_met") is not None
+                for r in state["step_results"]
+            )
+            if has_conditional:
+                return "action"
+            else:
+                return "done"
         return "next_step"
 
 

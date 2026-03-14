@@ -179,10 +179,14 @@ You were asked a question, and a query was run against the data.
 Analyze the results and respond with a JSON object:
 
 {{
-    "answer": "Clear yes/no answer with brief explanation",
-    "condition_met": true or false or null (if question doesn't have a yes/no condition),
+    "answer": "your answer",
+    "condition_met": true or false or null,
     "evidence": "Key data points that support your answer (keep brief)"
 }}
+
+Rules:
+- If the question is a yes/no condition (e.g. "are there overdue jobs?"), answer with yes/no + explanation, and set condition_met to true/false.
+- If the question is informational (e.g. "what are the running hours?"), give a direct answer with the actual values, and set condition_met to null.
 
 Return ONLY valid JSON. No markdown, no explanation outside the JSON.{context_str}"""
             },
